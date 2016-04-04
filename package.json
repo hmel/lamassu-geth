@@ -1,0 +1,22 @@
+{
+  "name": "lamassu-geth",
+  "version": "1.0.0",
+  "description": "lamassu-server plugin for the geth Ethereum wallet",
+  "main": "wallet.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/lamassu/lamassu-geth.git"
+  },
+  "author": "Josh Harvey <josh@lamassu.is> (https://lamassu.is/)",
+  "license": "UNLICENSE",
+  "bugs": {
+    "url": "https://github.com/lamassu/lamassu-geth/issues"
+  },
+  "homepage": "https://github.com/lamassu/lamassu-geth",
+  "dependencies": {
+    "web3": "^0.15.3"
+  }
+}
