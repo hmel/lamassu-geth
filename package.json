@@ -1,6 +1,6 @@
 {
   "name": "lamassu-geth",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "lamassu-server plugin for the geth Ethereum wallet",
   "main": "wallet.js",
   "scripts": {
