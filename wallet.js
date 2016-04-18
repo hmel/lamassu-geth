@@ -10,20 +10,24 @@ if (!web3.isConnected()) {
   web3.setProvider(new web3.providers.HttpProvider('http://localhost:8545'))
 }
 
-// Note: it's still called sendBitcoins for backwards compatibility, but this
-// is for any currency
-exports.sendBitcoins = function sendBitcoins (address, satoshis, fee, callback) {
+exports.sendBitcoins = function sendBitcoins (address, cryptoAtoms, cryptoCode, fee, callback) {
   web3.eth.sendTransaction({
+    from: web3.eth.coinbase,
     to: address,
-    value: satoshis
+    value: cryptoAtoms
   }, callback)
 }
 
 exports.balance = function balance (cb) {
   var coinbase = web3.eth.coinbase
-  web3.eth.getBalance(coinbase, 'pending', cb)
+  web3.eth.getBalance(coinbase, 'pending', function (err, res) {
+    if (err) return cb(err)
+    cb(null, {ETH: res})
+  })
 }
 
 exports.newAddress = function newAddress (info, callback) {
   throw new Error('Not implemented')
 }
+
+exports.config = function config () {}
