@@ -19,11 +19,15 @@ exports.sendBitcoins = function sendBitcoins (address, cryptoAtoms, cryptoCode, 
 }
 
 exports.balance = function balance (cb) {
-  var coinbase = web3.eth.coinbase
-  web3.eth.getBalance(coinbase, 'pending', function (err, res) {
-    if (err) return cb(err)
-    cb(null, {ETH: res})
-  })
+  try {
+    var coinbase = web3.eth.coinbase
+    web3.eth.getBalance(coinbase, 'pending', function (err, res) {
+      if (err) return cb(err)
+      cb(null, {ETH: res})
+    })
+  } catch (err) {
+    return cb(err)
+  }
 }
 
 exports.newAddress = function newAddress (info, callback) {
