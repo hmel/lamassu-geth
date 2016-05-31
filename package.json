@@ -17,6 +17,8 @@
   },
   "homepage": "https://github.com/lamassu/lamassu-geth",
   "dependencies": {
+    "ethereumjs-tx": "^1.1.1",
+    "ethereumjs-wallet": "^0.6.0",
     "web3": "^0.15.3"
   }
 }

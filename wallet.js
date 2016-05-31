@@ -1,10 +1,15 @@
 'use strict'
 
-var Web3 = require('web3')
-var web3 = new Web3()
+const Web3 = require('web3')
+const web3 = new Web3()
+const hdkey = require('ethereumjs-wallet/hdkey')
 
 exports.NAME = 'geth'
 exports.SUPPORTED_MODULES = ['wallet']
+
+var hdNode
+
+const prefixPath = "m/44'/60'/0'/0'"
 
 if (!web3.isConnected()) {
   web3.setProvider(new web3.providers.HttpProvider('http://localhost:8545'))
@@ -33,8 +38,18 @@ exports.balance = function balance (cb) {
   }
 }
 
-exports.newAddress = function newAddress (info, callback) {
-  throw new Error('Not implemented')
+exports.sweep = function sweep (serialNumber, toAddress) {
+  // Get balance, compute fees, send max to toAddress
 }
 
-exports.config = function config () {}
+exports.newAddress = function newAddress (info, callback) {
+  const childNode = hdNode.deriveChild(info.serialNumber)
+  return callback(null, childNode.getWallet().getChecksumAddressString())
+}
+
+exports.config = function config (rec) {
+  const masterSeed = rec.masterSeed
+  if (!masterSeed) throw new Error('No master seed!')
+  const key = hdkey.fromMasterSeed(masterSeed)
+  hdNode = key.derivePath(prefixPath)
+}
