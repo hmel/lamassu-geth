@@ -10,9 +10,13 @@ if (!web3.isConnected()) {
   web3.setProvider(new web3.providers.HttpProvider('http://localhost:8545'))
 }
 
+function defaultAccount () {
+  return web3.eth.defaultAccount || web3.eth.coinbase
+}
+
 exports.sendBitcoins = function sendBitcoins (address, cryptoAtoms, cryptoCode, fee, callback) {
   web3.eth.sendTransaction({
-    from: web3.eth.coinbase,
+    from: defaultAccount(),
     to: address,
     value: cryptoAtoms
   }, callback)
@@ -20,8 +24,7 @@ exports.sendBitcoins = function sendBitcoins (address, cryptoAtoms, cryptoCode, 
 
 exports.balance = function balance (cb) {
   try {
-    var coinbase = web3.eth.coinbase
-    web3.eth.getBalance(coinbase, 'pending', function (err, res) {
+    web3.eth.getBalance(defaultAccount(), 'pending', function (err, res) {
       if (err) return cb(err)
       cb(null, {ETH: res})
     })
