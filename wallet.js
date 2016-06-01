@@ -1,8 +1,10 @@
+// @flow weak
 'use strict'
 
 const Web3 = require('web3')
 const web3 = new Web3()
 const hdkey = require('ethereumjs-wallet/hdkey')
+const Tx = require('ethereumjs-tx')
 
 exports.NAME = 'geth'
 exports.SUPPORTED_MODULES = ['wallet']
@@ -19,6 +21,8 @@ function defaultAccount () {
   return web3.eth.defaultAccount || web3.eth.coinbase
 }
 
+const hex = bigNum => '0x' + bigNum.truncated().toString(16)
+
 exports.sendBitcoins = function sendBitcoins (address, cryptoAtoms, cryptoCode, fee, callback) {
   web3.eth.sendTransaction({
     from: defaultAccount(),
@@ -28,23 +32,111 @@ exports.sendBitcoins = function sendBitcoins (address, cryptoAtoms, cryptoCode, 
 }
 
 exports.balance = function balance (cb) {
-  try {
-    web3.eth.getBalance(defaultAccount(), 'pending', function (err, res) {
-      if (err) return cb(err)
-      cb(null, {ETH: res})
-    })
-  } catch (err) {
-    return cb(err)
-  }
+  return pendingBalance(defaultAccount())
+  .then(res => cb(null, {ETH: res})).catch(cb)
 }
 
-exports.sweep = function sweep (serialNumber, toAddress) {
-  // Get balance, compute fees, send max to toAddress
+const pendingBalance = address => _balance(true, address)
+const confirmedBalance = address => _balance(false, address)
+
+function _balance (includePending, address) {
+  const block = includePending ? 'pending' : null
+
+  return new Promise((resolve, reject) => {
+    try {
+      web3.eth.getBalance(defaultAccount(), block, function (err, res) {
+        if (err) return reject(err)
+        resolve(res)
+      })
+    } catch (err) {
+      reject(err)
+    }
+  })
+}
+
+/*
+var privateKey = new Buffer('e331b6d69882b4cb4ea581d88e0b604039a3de5967688d3dcffdd2270c0fd109', 'hex')
+
+var rawTx = {
+  nonce: '0x00',
+  gasPrice: '0x09184e72a000',
+  gasLimit: '0x2710',
+  to: '0x0000000000000000000000000000000000000000',
+  value: '0x00',
+  data: '0x7f7465737432000000000000000000000000000000000000000000000000000000600057'
+}
+
+var tx = new Tx(rawTx)
+tx.sign(privateKey)
+
+var serializedTx = tx.serialize()
+*/
+
+function generateTx (fromAddress, toAddress, fromSerial, amount) {
+  const derivedAddress = wallet.getChecksumAddressString()
+
+  if (fromAddress.toLowerCase() !== derivedAddress.toLowerCase()) {
+    const errMsg = `Address [${fromAddress}] does not match HD serial number [${fromSerial}]`
+    return Promise.reject(new Error(errMsg))
+  }
+
+  const txTemplate = {
+    from: fromAddress,
+    to: toAddress,
+    value: amount
+  }
+
+  const gas = web3.eth.estimateGas(txTemplate)
+  const gasPrice = web3.eth.gasPrice
+  const toSend = amount.minus(gas.times(gasPrice))
+  const nonce = web3.eth.getTransactionCount(fromAddress) + 1
+
+  const rawTx = {
+    nonce: nonce,
+    gasPrice: hex(gasPrice),
+    gasLimit: hex(gas),
+    to: toAddress,
+    from: fromAddress,
+    value: hex(toSend)
+  }
+
+  const tx = new Tx(rawTx)
+  const wallet = hdNode.deriveChild(fromSerial).getWallet()
+  const privateKey = wallet.getPrivateKey()
+
+  tx.sign(privateKey)
+
+  return tx.serialize()
+}
+
+exports.sweep = function sweep (serialNumber, address) {
+  return confirmedBalance(address)
+  .then(r => {
+    if (r.eq(0)) return
+
+    return generateTx(address, defaultAccount(), serialNumber, r)
+    .then(signedTx => web3.eth.sendRawTransaction(signedTx))
+  })
 }
 
 exports.newAddress = function newAddress (info, callback) {
   const childNode = hdNode.deriveChild(info.serialNumber)
   return callback(null, childNode.getWallet().getChecksumAddressString())
+}
+
+// This new call uses promises. We're in the process of upgrading everything.
+exports.getStatus = function getStatus (toAddress, requested) {
+  return confirmedBalance(toAddress)
+  .then(confirmed => {
+    if (confirmed.gte(requested)) return {status: 'confirmed'}
+
+    return pendingBalance(toAddress)
+    .then(pending => {
+      if (pending.gte(requested)) return {status: 'published'}
+      if (pending.gt(0)) return {status: 'insufficientFunds'}
+      return {status: 'notSeen'}
+    })
+  })
 }
 
 exports.config = function config (rec) {
