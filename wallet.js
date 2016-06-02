@@ -54,13 +54,9 @@ function _balance (includePending, address) {
   })
 }
 
-function generateTx (fromAddress, toAddress, fromSerial, amount) {
-  const derivedAddress = wallet.getChecksumAddressString()
-
-  if (fromAddress.toLowerCase() !== derivedAddress.toLowerCase()) {
-    const errMsg = `Address [${fromAddress}] does not match HD serial number [${fromSerial}]`
-    return Promise.reject(new Error(errMsg))
-  }
+function generateTx (toAddress, fromSerial, amount) {
+  const wallet = hdNode.deriveChild(fromSerial).getWallet()
+  const fromAddress = wallet.getChecksumAddressString()
 
   const txTemplate = {
     from: fromAddress,
@@ -83,7 +79,6 @@ function generateTx (fromAddress, toAddress, fromSerial, amount) {
   }
 
   const tx = new Tx(rawTx)
-  const wallet = hdNode.deriveChild(fromSerial).getWallet()
   const privateKey = wallet.getPrivateKey()
 
   tx.sign(privateKey)
@@ -91,12 +86,15 @@ function generateTx (fromAddress, toAddress, fromSerial, amount) {
   return tx.serialize()
 }
 
-exports.sweep = function sweep (serialNumber, address) {
+exports.sweep = function sweep (serialNumber) {
+  const wallet = hdNode.deriveChild(serialNumber).getWallet()
+  const address = wallet.getChecksumAddressString()
+
   return confirmedBalance(address)
   .then(r => {
     if (r.eq(0)) return
 
-    return generateTx(address, defaultAccount(), serialNumber, r)
+    return generateTx(defaultAccount(), serialNumber, r)
     .then(signedTx => web3.eth.sendRawTransaction(signedTx))
   })
 }
