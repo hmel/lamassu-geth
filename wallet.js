@@ -5,6 +5,7 @@ const Web3 = require('web3')
 const web3 = new Web3()
 const hdkey = require('ethereumjs-wallet/hdkey')
 const Tx = require('ethereumjs-tx')
+const pify = require('pify')
 
 exports.NAME = 'geth'
 exports.SUPPORTED_MODULES = ['wallet']
@@ -18,21 +19,27 @@ if (!web3.isConnected()) {
 }
 
 function defaultAccount () {
-  return web3.eth.defaultAccount || web3.eth.coinbase
+  return pify(web3.eth.getCoinbase)()
 }
 
 const hex = bigNum => '0x' + bigNum.truncated().toString(16)
 
-exports.sendBitcoins = function sendBitcoins (address, cryptoAtoms, cryptoCode, fee, callback) {
-  web3.eth.sendTransaction({
+exports.sendBitcoins = function sendBitcoins (_address, cryptoAtoms, cryptoCode, fee, callback) {
+  const address = _address.toLowerCase()
+  const rec = {
     from: defaultAccount(),
     to: address,
     value: cryptoAtoms
-  }, callback)
+  }
+
+  return pify(web3.eth.sendTransaction)(rec)
+  .then(r => callback(null, r))
+  .catch(callback)
 }
 
 exports.balance = function balance (cb) {
-  return pendingBalance(defaultAccount())
+  return defaultAccount()
+  .then(pendingBalance)
   .then(res => cb(null, {ETH: res})).catch(cb)
 }
 
@@ -40,23 +47,17 @@ const pendingBalance = address => _balance(true, address)
 const confirmedBalance = address => _balance(false, address)
 
 function _balance (includePending, address) {
-  const block = includePending ? 'pending' : null
+  const block = includePending ? 'pending' : undefined
 
-  return new Promise((resolve, reject) => {
-    try {
-      web3.eth.getBalance(defaultAccount(), block, function (err, res) {
-        if (err) return reject(err)
-        resolve(res)
-      })
-    } catch (err) {
-      reject(err)
-    }
-  })
+  return pify(web3.eth.getBalance)(address.toLowerCase(), block)
 }
 
-function generateTx (toAddress, fromSerial, amount) {
+function generateTx (_toAddress, fromSerial, amount) {
   const wallet = hdNode.deriveChild(fromSerial).getWallet()
-  const fromAddress = wallet.getChecksumAddressString()
+  const fromAddress = '0x' + wallet.getAddress().toString('hex')
+  const toAddress = _toAddress.toLowerCase()
+
+  console.log('DEBUG101: %s', fromAddress)
 
   const txTemplate = {
     from: fromAddress,
@@ -64,26 +65,39 @@ function generateTx (toAddress, fromSerial, amount) {
     value: amount
   }
 
-  const gas = web3.eth.estimateGas(txTemplate)
-  const gasPrice = web3.eth.gasPrice
-  const toSend = amount.minus(gas.times(gasPrice))
-  const nonce = web3.eth.getTransactionCount(fromAddress) + 1
+  const promises = [
+    pify(web3.eth.estimateGas)(txTemplate),
+    pify(web3.eth.getGasPrice)(),
+    pify(web3.eth.getTransactionCount)(fromAddress)
+  ]
 
-  const rawTx = {
-    nonce: nonce,
-    gasPrice: hex(gasPrice),
-    gasLimit: hex(gas),
-    to: toAddress,
-    from: fromAddress,
-    value: hex(toSend)
-  }
+  return Promise.all(promises)
+  .then(arr => {
+    const gas = arr[0]
+    const gasPrice = arr[1]
+    const txCount = arr[2]
 
-  const tx = new Tx(rawTx)
-  const privateKey = wallet.getPrivateKey()
+    const toSend = amount.minus(gasPrice.times(gas))
 
-  tx.sign(privateKey)
+    const rawTx = {
+      nonce: txCount,
+      gasPrice: hex(gasPrice),
+      gasLimit: gas,
+      to: toAddress,
+      from: fromAddress,
+      value: hex(toSend)
+    }
 
-  return tx.serialize()
+    console.log(rawTx)
+
+    const tx = new Tx(rawTx)
+    const privateKey = wallet.getPrivateKey()
+
+    tx.sign(privateKey)
+
+    console.log(tx.serialize().toString('hex'))
+    return tx.serialize().toString('hex')
+  })
 }
 
 exports.sweep = function sweep (serialNumber) {
@@ -94,8 +108,9 @@ exports.sweep = function sweep (serialNumber) {
   .then(r => {
     if (r.eq(0)) return
 
-    return generateTx(defaultAccount(), serialNumber, r)
-    .then(signedTx => web3.eth.sendRawTransaction(signedTx))
+    return defaultAccount()
+    .then(account => generateTx(account, serialNumber, r))
+    .then(signedTx => pify(web3.eth.sendRawTransaction)(signedTx))
   })
 }
 
