@@ -57,8 +57,6 @@ function generateTx (_toAddress, fromSerial, amount) {
   const fromAddress = '0x' + wallet.getAddress().toString('hex')
   const toAddress = _toAddress.toLowerCase()
 
-  console.log('DEBUG101: %s', fromAddress)
-
   const txTemplate = {
     from: fromAddress,
     to: toAddress,
@@ -88,14 +86,11 @@ function generateTx (_toAddress, fromSerial, amount) {
       value: hex(toSend)
     }
 
-    console.log(rawTx)
-
     const tx = new Tx(rawTx)
     const privateKey = wallet.getPrivateKey()
 
     tx.sign(privateKey)
 
-    console.log(tx.serialize().toString('hex'))
     return tx.serialize().toString('hex')
   })
 }
