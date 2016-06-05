@@ -24,6 +24,8 @@ function defaultAccount () {
 
 const hex = bigNum => '0x' + bigNum.truncated().toString(16)
 
+exports.supportsHD = true
+
 exports.sendBitcoins = function sendBitcoins (_address, cryptoAtoms, cryptoCode, fee, callback) {
   const address = _address.toLowerCase()
   const rec = {
