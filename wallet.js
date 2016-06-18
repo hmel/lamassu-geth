@@ -1,4 +1,3 @@
-// @flow weak
 'use strict'
 
 const Web3 = require('web3')
@@ -28,13 +27,17 @@ exports.supportsHD = true
 
 exports.sendBitcoins = function sendBitcoins (_address, cryptoAtoms, cryptoCode, fee, callback) {
   const address = _address.toLowerCase()
-  const rec = {
-    from: defaultAccount(),
-    to: address,
-    value: cryptoAtoms
-  }
 
-  return pify(web3.eth.sendTransaction)(rec)
+  return defaultAccount()
+  .then(from => {
+    const rec = {
+      from: from,
+      to: address,
+      value: cryptoAtoms
+    }
+
+    return pify(web3.eth.sendTransaction)(rec)
+  })
   .then(r => callback(null, r))
   .catch(callback)
 }
